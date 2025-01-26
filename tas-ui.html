@@ -1,0 +1,267 @@
+<html>
+<head>
+    <title>TASMaker MV</title>
+    <style>
+        body {
+            background: black;
+        }
+        table {
+            color: white;
+            border-bottom: solid;
+            border-collapse: collapse;
+            width: 100%
+        }
+        th {
+            color: white;
+            border-style: solid;
+            position: sticky;
+        }
+        tr {
+            border-bottom-style: ridge;
+            border-bottom-color: gray;
+        }
+        td {
+            color: white; 
+            border-left-style: solid;
+            border-right-style: solid;
+            border-spacing: 0px;
+            margin: 0px;
+        }
+        .loading {
+            text-align: center;
+            width: 100%;
+            height: 100%;
+            color: white;
+        }
+        .frameInput {
+            text-align: center;
+            background: black;
+            position: relative;
+            height: 100%;
+            width: 100%;
+            color: black;
+            margin: 0px;
+            border: none;
+        }
+        .frameInput:not(:disabled):hover {
+            cursor: pointer;
+            color: white;
+        }
+        .frameInput:not(.selected):not(:disabled):hover {
+            background: #303030;
+        }
+        .frameInput.selected {
+            display: block;
+            background: gray;
+            color: white;
+        }
+        .controls {
+            z-index: 9999;
+            position: sticky;
+            border-style: solid;
+            background: black;
+            color: white;
+            top: 0px;
+        }
+        .currentFrame {
+            background: blue;
+        }
+        .pastFrame {
+            opacity: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <input type="checkbox" id="live" onclick="toggleLiveScroll()" checked>
+        <label for="live">Live scrolling (may cause game lag)</label>
+    </div>
+    
+    <div class="inputs" id="inputs">
+        <table id="inputList">
+            <tr id="header">
+                <th>Frame</th>
+            </tr>
+        </table>
+    </div>
+
+    <h2 class="loading" id="loading">Loading...</h2>
+    
+    <script>
+
+    var liveScroll = true;
+
+    let contents = document.getElementById("inputs");
+    let header = document.getElementById("header");
+    let table = document.getElementById("inputList");
+   
+    function setup(TAS) {
+        window.TAS = TAS;
+
+        clearElements("inputName");
+        clearElements("frameRow");
+
+        let titles = TAS.movie.inputNames;
+        for(let title in titles) {
+            addInputHeader(titles[title]);
+        }
+        const numFrames = TAS.movie.frames.length;
+        for(let i = 0; i < numFrames; i++) {
+            addFrame(i);
+        }
+        let loadingText = document.getElementById("loading");
+        if(loadingText) {
+            loadingText.remove();
+        }
+    }
+
+    function clearElements(clazz) {
+        let elements = document.getElementsByClassName(clazz);
+        for(let i = 0; i < elements.length; i++) {
+            elements[i].remove();
+        }
+    }
+
+    var busy = false;
+
+    let lastFrame = -1;
+    let lastFrameElement = undefined;
+    function tick(frameNo) {
+        if(!liveScroll && !TAS.active) return;
+
+        busy = true;
+        let frame = TAS.movie.frames[frameNo];
+
+        if(lastFrame !== frameNo) {
+            if(lastFrameElement) {
+                lastFrameElement.classList.remove("currentFrame");
+                lastFrameElement = undefined;
+            }
+            else {
+                let old = document.getElementsByClassName("currentFrame");
+                for(let i = 0; i < old.length; i++) {
+                    old[i].classList.remove("currentFrame");
+                }
+            }
+            let current = document.getElementById("row" + frameNo);
+            if(current) {
+                lastFrameElement = current;
+                current.classList.add("currentFrame");
+                current.scrollIntoView({ behavior: "instant", block: "center" });
+            }
+            lastFrame = frameNo;
+        }
+
+        while(table.childElementCount - 1 < frameNo) {
+            addFrame(table.childElementCount - 1);
+        }
+
+        requestAnimationFrame(() => busy = false);
+    }
+
+    function addInputHeader(name) {
+        if(document.getElementById(name)) {
+            throw new Error("Duplicate header " + name);
+        }
+        let e = document.createElement("th");
+        e.textContent = name;
+        e.className = "inputName";
+        e.id = name;
+        header.appendChild(e);
+    }
+
+    function createInputButton(frame, name, data) {
+        let e = document.createElement("td");
+        let input = document.createElement("button");
+        e.className = name;
+
+        input.className = "frameInput";
+        input.id = frame + "_" + name;
+        input.onclick = handleFrameInput;
+        input.textContent = name;
+        e.appendChild(input);
+
+        if(data && data[name]) {
+            input.classList.add("selected");
+        }
+        return e;
+    }
+
+    function addFrame(frame) {
+        let titles = TAS.movie.inputNames;
+        let data = TAS.movie.frames[frame];
+
+        // handled here because this data is only used for this UI
+        if(data) {
+            for(let key in data) {
+                if(key !== "tab" && titles.indexOf(key) === -1) {
+                    let rows = document.getElementsByClassName("frameRow");
+                    for(let i = 0; i < rows.length; i++) {
+                        rows[i].appendChild(createInputButton(row.id.substring(3), key, data))
+                    }
+                    addInputHeader(key);
+                    titles.push(key);
+                }
+            }
+        }
+
+
+        let row = document.createElement("tr");
+        let frameNo = document.createElement("td");
+        frameNo.textContent = frame;
+        row.classList.add("frame" + frame);
+        row.classList.add("frameRow");
+        row.id = "row" + frame;
+        row.appendChild(frameNo);
+        
+        for(let title in titles) {
+            row.appendChild(createInputButton(frame, titles[title], data));
+        }
+
+        table.appendChild(row);
+    }
+
+
+    function handleFrameInput() {
+        console.log(this.id);
+        let selected = this.classList.contains("selected");
+
+        if(window.TAS) {
+            let [frame, input] = this.id.split("_");
+            if(TAS.frame > frame) return;
+
+            TAS.movie.frames[frame][input.toLowerCase()] = !selected; // inverted at this point
+        }
+        
+        if(selected) {
+            this.classList.remove("selected");
+        }
+        else {
+            this.classList.add("selected");
+        }
+    }
+
+    function toggleLiveScroll() {
+        liveScroll = !liveScroll;
+
+        if(!liveScroll && lastFrameElement) {
+            lastFrameElement.classList.remove("currentFrame");
+            lastFrameElement = undefined;
+        }
+
+        let buttons = document.getElementsByClassName("frameInput");
+        for(let i = 0; i < buttons.length; i++) {
+            buttons[i].disabled = !liveScroll;
+        }
+    }
+
+    window.addEventListener("message", function(event) {
+        const msg = event.data[0];
+        if(msg === "tick") {
+            tick(event.data[1]);
+        }
+    });
+    
+    </script>
+</body>
+</html>

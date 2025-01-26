@@ -1,0 +1,18 @@
+{
+    "$schema": "https://rph.space/oneloader.manifestv1.schema.json",
+    "id":"tasmv",
+    "name":"TASMaker MV",
+    "description": "Maybe a TAS framework for RPGMaker games. (don't count on it to work everywhere)",
+    "manifestVersion": 1,
+    "version": "0.0.1",
+    "_flags":[],
+    "files":{
+        "plugins":["tas-rng.js", "tas-ui.js", "tas.js"],
+        "raw":["tas-ui.html"]
+    },
+    "asyncExec":[{
+        "runat": "pre_plugin_injection",
+        "file":  "tas-async-hooks.js"
+    }],
+    "satisfies": []
+}
