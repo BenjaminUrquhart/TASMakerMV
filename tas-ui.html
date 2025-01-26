@@ -75,6 +75,10 @@
     <div class="controls">
         <input type="checkbox" id="live" onclick="toggleLiveScroll()" checked>
         <label for="live">Live scrolling (may cause game lag)</label>
+        <input type="radio" id="recording" name="state" onclick="TAS.state = TAS.State.RECORDING">
+        <label for="recording">Recording</label>
+        <input type="radio" id="playback"  name="state" onclick="TAS.state = TAS.State.PLAYBACK" >
+        <label for="playback"> Playback </label>
     </div>
     
     <div class="inputs" id="inputs">
@@ -94,9 +98,15 @@
     let contents = document.getElementById("inputs");
     let header = document.getElementById("header");
     let table = document.getElementById("inputList");
+
+    let recordingButton = document.getElementById("recording");
+    let playbackButton = document.getElementById("playback");
    
     function setup(TAS) {
         window.TAS = TAS;
+
+        recordingButton.checked = TAS.state === TAS.State.RECORDING;
+        playbackButton.checked = TAS.state === TAS.State.PLAYBACK;
 
         clearElements("inputName");
         clearElements("frameRow");
@@ -133,6 +143,9 @@
         let frame = TAS.movie.frames[frameNo];
 
         if(lastFrame !== frameNo) {
+            while(table.childElementCount <= frameNo) {
+                addFrame(table.childElementCount);
+            }
             if(lastFrameElement) {
                 lastFrameElement.classList.remove("currentFrame");
                 lastFrameElement = undefined;
@@ -150,10 +163,6 @@
                 current.scrollIntoView({ behavior: "instant", block: "center" });
             }
             lastFrame = frameNo;
-        }
-
-        while(table.childElementCount - 1 < frameNo) {
-            addFrame(table.childElementCount - 1);
         }
 
         requestAnimationFrame(() => busy = false);
@@ -197,7 +206,7 @@
                 if(key !== "tab" && titles.indexOf(key) === -1) {
                     let rows = document.getElementsByClassName("frameRow");
                     for(let i = 0; i < rows.length; i++) {
-                        rows[i].appendChild(createInputButton(row.id.substring(3), key, data))
+                        rows[i].appendChild(createInputButton(rows[i].id.substring(3), key))
                     }
                     addInputHeader(key);
                     titles.push(key);

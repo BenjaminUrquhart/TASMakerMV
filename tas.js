@@ -79,7 +79,7 @@ TAS.functionBlacklist = [];
             else if(event.key === "v" || event.key === "V") {
                 this.step = this.active;
             }
-            else if(this.state === State.RECORDING && (event.key === "s" || event.key === "S")) {
+            else if(event.key === "s" || event.key === "S") {
                 fs.writeFileSync("movie.json", JSON.stringify(this.movie));
                 console.log("Saved movie");
             }
@@ -92,7 +92,6 @@ TAS.functionBlacklist = [];
 
         this.setupHooks();
         this.createFrameView();
-        this.preloadAssets();
     }
 
     TAS.setupHooks = function() {
@@ -105,6 +104,13 @@ TAS.functionBlacklist = [];
                 }
             }
             return TAS.rng.next();
+        }
+
+        // Lag reduction (preloading)
+        let loadSystemImages = Scene_Boot.loadSystemImages;
+        Scene_Boot.loadSystemImages = function() {
+            TAS.preloadAssets();
+            return loadSystemImages.call(this);
         }
 
         // Scene loading
@@ -181,7 +187,7 @@ TAS.functionBlacklist = [];
             else {
                 this.gameTick();
             }
-            if(TAS._frameView?.window && !TAS._frameView.window.busy) {
+            if(TAS._frameView?.window?.tick && !TAS._frameView.window.busy) {
                 TAS._frameView.window.tick(frame);
             }
         }
@@ -196,12 +202,14 @@ TAS.functionBlacklist = [];
             else if(!TAS.active || TAS.step) {
                 if(TAS.state === State.PLAYBACK) {
                     let data = TAS.movie.frames[TAS.frame];
+                    Input._previousState = Input._currentState;
                     if(data) {
-                        Input._previousState = Input._currentState;
+                        
                         Input._currentState = simpleClone(data);
                     }
                     else {
-                        TAS.active = true;
+                        Input._currentState = {};
+                        //TAS.active = true;
                     }
                 }
                 else if(TAS.state === State.RECORDING) {
@@ -294,7 +302,19 @@ TAS.functionBlacklist = [];
                         }
                         files.forEach(bg => {
                             try {
-                                loader.call(ImageManager, bg.endsWith(".png") ? bg.substring(0, bg.length - 4) : bg, 0, TAS.movie.seed);
+                                let index = bg.length - 1;
+                                while(bg[index] !== "." && bg[index] !== "/") {
+                                    index--;
+                                }
+                                if(bg[index] === ".") {
+                                    const ext = bg.substring(index + 1);
+                                    if(Decrypter.hasEncryptedImages && ext === "png") {
+                                        console.warn(`Skipping ${path}${bg}, non-encrypted image found in encrypted game.`);
+                                        return;
+                                    }
+                                    bg = bg.substring(0, index);
+                                }
+                                loader.call(ImageManager, bg, 0, TAS.movie.seed);
                                 console.log(`Loaded ${path}${bg}`);
                             }
                             catch(e) {
